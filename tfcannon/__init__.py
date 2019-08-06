@@ -1,1 +1,1 @@
-from tfcannon.model import TFcannon
+from tfcannon.model import TFCannon
