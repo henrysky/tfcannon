@@ -1,5 +1,4 @@
 import numpy as np
-import sys
 import tensorflow as tf
 import tensorflow_probability as tfp
 
@@ -7,7 +6,7 @@ import tensorflow_probability as tfp
 class TFcannon():
     def __init__(self, regularizer=None):
         """
-        Training
+        The Cannon implementation with Tensorflow
 
         :param regularizer: Regularization
         :type regularizer: float
@@ -34,6 +33,9 @@ class TFcannon():
         :return: None
         :History: 2019-Aug-02 - Written - Henry Leung (University of Toronto)
         """
+        # just in case only one label is provided
+        labels = np.atleast_2d(labels)
+
         self.nspec = spec.shape[0]
         self.npixels = spec.shape[1]
         self.nlabels = labels.shape[1]
@@ -47,16 +49,15 @@ class TFcannon():
         tf_labels = tf.convert_to_tensor(labels, dtype=tf.float32)
 
         # internal label matrix
-        stack_labels = tf.concat([tf.ones([self.nspec, 1], dtype=tf.float32), labels], axis=1)
-        stack_labels = self._quad_terms(stack_labels, tf_labels)
+        stack_labels = self._quad_terms(tf.concat([tf.ones([self.nspec, 1], dtype=tf.float32), tf_labels], axis=1))
 
         # initial
         init_scatter = tf.math.sqrt(tf.math.reduce_variance(tf_specs, axis=1) -
                                     tfp.stats.percentile(tf_specs_err, 50, axis=1) ** 2.)
 
         init_scatter = tf.where(tf.math.is_nan(init_scatter), tf.math.reduce_std(spec, axis=1), init_scatter)
-        final_coeffs = tf.ones([1, self.ncoeffs], dtype=tf.float32) * -9999.
-        final_scatter = tf.ones(1, dtype=tf.float32) * -9999.
+        final_coeffs = tf.ones([self.ncoeffs, 1], dtype=tf.float32) * -9999.
+        final_scatter = tf.ones([1], dtype=tf.float32) * -9999.
 
         i = tf.constant(0)
         out = tf.while_loop(lambda _specs, _specserr, _labels, _init_scatter, _i, _, __: tf.less(_i, self.npixels),
@@ -67,45 +68,60 @@ class TFcannon():
                                               stack_labels.get_shape(),
                                               init_scatter.get_shape(),
                                               i.get_shape(),
-                                              tf.TensorShape([None, self.ncoeffs]),
-                                              tf.TensorShape([None])])
+                                              tf.TensorShape([self.ncoeffs, None]),
+                                              tf.TensorShape([None, ])],
+                            parallel_iterations=128)
 
         with tf.Session() as sess:
             _, _, _, _, _, coeffs, scatter = sess.run(out)
 
-        return coeffs, scatter
+        # set model coeffs
+        self.coeffs[:, :] = coeffs[:, 1:]
+        self.scatter[:] = scatter[1:]
 
-    def _quad_terms(self, padded, labels):
-        def internal(_padded, _labels, ii, jj):
-            _padded = tf.concat([_padded, _labels[:, jj:] * tf.expand_dims(_labels[:, ii], axis=-1)], axis=1)
-            return _padded, _labels, tf.add(ii, 1), tf.add(jj, 1)
+    def _quad_terms(self, padded):
+        """
+        Stack all the quadratic terms in the label metrix
+
+        :param padded: Ones padded labels (i.e. offset + labels)
+        :return: stacked tensor of labels (i.e. offset + linear terms + quadratic terms)
+
+        :History: 2019-Aug-02 - Written - Henry Leung (University of Toronto)
+        """
+
+        def loop_body(_padded, ii):
+            _padded = tf.concat(
+                [_padded, _padded[:, ii + 1:self.nlabels + 1] * tf.expand_dims(_padded[:, ii + 1], axis=-1)],
+                axis=1)
+            return _padded, tf.add(ii, 1)
 
         i = tf.constant(0)
-        j = tf.constant(0)
-        all_padded = tf.while_loop(lambda _padded, _labels, _i, _j: tf.less(_i, self.nlabels),
-                                   internal,
-                                   [padded, labels, i, j],
+        all_padded = tf.while_loop(lambda _padded, _i: tf.less(_i, self.nlabels),
+                                   loop_body,
+                                   [padded, i],
                                    shape_invariants=[tf.TensorShape([self.nspec, None]),
-                                                     labels.get_shape(),
-                                                     i.get_shape(),
-                                                     j.get_shape()])
+                                                     i.get_shape()])
         return all_padded[0]
 
-    def _quad_fitting(self, specs, specs_err, labels, scatter, ii, final_coeffs, final_scatter):
+    def _quad_fitting(self, specs, specs_err, labels, scatters, ii, final_coeffs, final_scatter):
         spec = specs[:, ii]
         spec_err = specs_err[:, ii]
+        scatter = scatters[ii:ii + 1]
 
         def _quadfit_scatter_external(x):
             return self._quadfit_scatter(x, spec, spec_err, labels)
 
-        fits = tfp.optimizer.lbfgs_minimize(_quadfit_scatter_external, scatter, max_iterations=2)
+        fits = tfp.optimizer.lbfgs_minimize(_quadfit_scatter_external,
+                                            scatter,
+                                            max_iterations=2,  # Debugging to minimize time
+                                            x_tolerance=1e-7)
         result = fits.position
 
         final_coeffs = tf.concat(
-            [final_coeffs, tf.expand_dims(self._polyfit_coeffs(spec, spec_err, result, labels), axis=0)], axis=0)
-        # final_scatter = tf.stack([final_scatter, result])
+            [final_coeffs, tf.expand_dims(self._polyfit_coeffs(spec, spec_err, result, labels), axis=1)], axis=1)
+        final_scatter = tf.concat([final_scatter, result], axis=0)
 
-        return specs, specs_err, labels, scatter, tf.add(ii, 1), final_coeffs, final_scatter
+        return specs, specs_err, labels, scatters, tf.add(ii, 1), final_coeffs, final_scatter
 
     def _quadfit_scatter(self, scatter, spec, spec_err, labelA):
         """
@@ -113,14 +129,27 @@ class TFcannon():
         """
         tcoeffs = self._polyfit_coeffs(spec, spec_err, scatter, labelA)
         # Get residuals for a given linear model of the spectra
-        deno = spec_err ** 2. + scatter ** 2.
         mspec = tf.math.reduce_sum(tcoeffs[1:self.nlabels + 1] * labelA[:, 1:self.nlabels + 1], axis=-1)
 
-        for ii in range(self.nlabels):
-            for jj in range(ii, self.nlabels):
-                mspec += tcoeffs[self.nlabels + 1 + (ii * (2 * self.nlabels + 1 - ii)) // 2 + jj - ii] * labelA[:, 1 + ii] * labelA[:, 1 + jj]
+        def loop_body(_mspec, ii):
+            label_terms = labelA[:, ii+1:ii+2] * labelA[:, ii + 1:self.nlabels + 1]
+            terms = tf.math.reduce_sum((tcoeffs[self.nlabels + 1 + (ii * (2 * self.nlabels + 1 - ii)) // 2:
+                                                self.nlabels + 1 + (ii * (
+                                                            2 * self.nlabels + 1 - ii)) // 2 + self.nlabels - ii]) *
+                                       label_terms,
+                                       axis=1)
+            _mspec = tf.add(_mspec, terms)
+            return _mspec, tf.add(ii, 1)
 
-        tres = spec - mspec - tcoeffs[0]
+        i = tf.constant(0)
+        sum_mspec = tf.while_loop(lambda _padded, _i: tf.less(_i, self.nlabels),
+                                  loop_body,
+                                  [mspec, i],
+                                  shape_invariants=[tf.TensorShape([self.nspec, ]),
+                                                    i.get_shape()])[0]
+
+        tres = spec - sum_mspec - tcoeffs[0]
+        deno = spec_err ** 2. + scatter ** 2.
         output = 0.5 * tf.math.reduce_sum(tres ** 2. / deno) + 0.5 * tf.math.reduce_sum(tf.math.log(deno))
 
         return output, tf.gradients(output, scatter)[0]

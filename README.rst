@@ -2,9 +2,9 @@
 Introduction
 ==============
 
-``tfcannon`` is a version of `the Cannon` implemented with `Tensorflow`_
+``tfcannon`` is a version of ``the Cannon`` implemented with `Tensorflow`_ which enables it to be ran on NVIDIA GPU
 
-If you find this package usage for your research, please cite original implementation paper `the Cannon`_ and `the Cannon 2`_
+If you find this package useful for your research, please cite original implementation paper `the Cannon`_ and `the Cannon 2`_
 and acknowledge this repository as you like.
 
 **work in progress nothing is working properly**
@@ -14,15 +14,20 @@ and acknowledge this repository as you like.
 Installation
 =================
 
-Just run ``python setup.py install`` to install or run ``python setup.py install`` to develop
+``tfcannon`` requires ``python>=3.6`` and ``tensorflow>=1.14.0`` and ``tensorflow_probability>=0.7.0``
 
-Developed with ``tensorflow==1.14.0``
+NVIDIA GPU is required if you want it to run on GPU
+
+Just run ``python setup.py install`` to install or run ``python setup.py develop`` to develop
 
 To do list
 ==========================
 
 - Get it to work
 - Investigate why some operations are still running on CPU??
+- Investigate why ``tfcannon`` is so demanding on GPU bandwidth (thus slower on ``geir``)
+- Add travis-CI, because tensorflow easily be broken
+- Include function to find continuum
 - Support censoring
 
 Usage
