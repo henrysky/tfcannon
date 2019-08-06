@@ -69,8 +69,7 @@ class TFcannon():
                                               init_scatter.get_shape(),
                                               i.get_shape(),
                                               tf.TensorShape([self.ncoeffs, None]),
-                                              tf.TensorShape([None, ])],
-                            parallel_iterations=128)
+                                              tf.TensorShape([None, ])])
 
         with tf.Session() as sess:
             _, _, _, _, _, coeffs, scatter = sess.run(out)
@@ -78,6 +77,40 @@ class TFcannon():
         # set model coeffs
         self.coeffs[:, :] = coeffs[:, 1:]
         self.scatter[:] = scatter[1:]
+
+    def test(self, spec, specerr):
+        """
+        Takes spectra and return best fit labels (based on numpy so far, numpy seems faster)
+
+        :param spec: spectra
+        :type spec: ndarray
+        :param specerr: spectra-err
+        :type specerr: ndarray
+        :return: None
+        :History: 2019-Aug-06 - Written - Henry Leung (University of Toronto)
+        """
+        # just in case only one spectrum is provided
+        spec = np.atleast_2d(spec)
+        specerr = np.atleast_2d(specerr)
+
+        # Setup output
+        nspec = spec.shape[0]
+        ncoeffs = self.coeffs.shape[0]
+
+        nlabels = int((-3 + np.sqrt(9 + 8 * (ncoeffs - 1)))) // 2
+
+        out = np.empty((nspec, nlabels))
+
+        for ii in range(nspec):
+            deno = specerr[ii] ** 2. + self.scatter ** 2.
+            Y = (spec[ii] - self.coeffs[0]) / deno
+            ATY = np.dot(self.coeffs[1:], Y)
+            CiA = self.coeffs[1:].T * np.tile(1. / deno, (self.coeffs[1:].T.shape[1], 1)).T
+            ATCiA = np.dot(self.coeffs[1:], CiA)
+            ATCiAinv = np.linalg.inv(ATCiA)
+            out[ii] = np.dot(ATCiAinv, ATY)[:nlabels]
+
+        return out
 
     def _quad_terms(self, padded):
         """
@@ -113,7 +146,6 @@ class TFcannon():
 
         fits = tfp.optimizer.lbfgs_minimize(_quadfit_scatter_external,
                                             scatter,
-                                            max_iterations=2,  # Debugging to minimize time
                                             x_tolerance=1e-7)
         result = fits.position
 
