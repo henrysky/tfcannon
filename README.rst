@@ -7,10 +7,6 @@ Introduction
 If you find this package useful for your research, please cite original implementation paper `the Cannon`_ and `the Cannon 2`_
 and acknowledge this repository as you like.
 
-**work in progress nothing is working properly**
-
-**Mostly run without error**
-
 Installation
 =================
 
@@ -23,9 +19,10 @@ Just run ``python setup.py install`` to install or run ``python setup.py develop
 To do list
 ==========================
 
-- Get it to work
 - Investigate why some operations are still running on CPU??
 - Investigate why ``tfcannon`` is so demanding on GPU bandwidth (thus slower on ``geir``)
+- Add progress bar
+- Add save model function (can I use tensorflow model??)
 - Add travis-CI, because tensorflow easily be broken
 - Include function to find continuum
 - Support censoring
@@ -42,11 +39,16 @@ Usage
     # x_err: your spectra error
     # y: your labels
     # this will fit a quadratic relation
-    coeffs, scatter = model.train(x, x_err, y)
+    model.train(x, x_err, y)
+
     # final coefficient and result
+    model.coeffs, model.scatters
 
-    # model coefficient
+    # Best fit labels when you provide spectra
+     best_fit_labels = model.test(spectra, spectra_err)
 
+    # Generate spectra provided labels
+     spectra = model.generate(labels)
 
 Authors
 =========

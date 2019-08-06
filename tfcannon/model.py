@@ -112,6 +112,24 @@ class TFcannon():
 
         return out
 
+    def generate(self, labels):
+        """
+        Generate spectra from given  labels (based on numpy so far, numpy seems faster)
+
+        :param labels: labels
+        :type labels: ndarray
+        :return: None
+        :History: 2019-Aug-06 - Written - Henry Leung (University of Toronto)
+        """
+        # in case of only 1 label, then append offset
+        labels = np.hstack([np.ones([1, 1]), np.atleast_2d(labels)])
+
+        # append quadratic terms
+        for ii in range(self.nlabels):
+            labels = np.hstack([labels, labels[:, ii + 1:self.nlabels + 1] * np.atleast_2d(labels[:, ii + 1])])
+
+        return np.dot(labels, self.coeffs)
+
     def _quad_terms(self, padded):
         """
         Stack all the quadratic terms in the label metrix
