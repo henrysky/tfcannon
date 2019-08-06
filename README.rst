@@ -32,9 +32,9 @@ Usage
 
 .. code-block:: python
 
-    from tfcannon import TFcannon
+    from tfcannon import TFCannon
 
-    model = TFcannon()
+    model = TFCannon()
     # x: your spectra
     # x_err: your spectra error
     # y: your labels

@@ -3,7 +3,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 
-class TFcannon():
+class TFCannon:
     def __init__(self, regularizer=None):
         """
         The Cannon implementation with Tensorflow
@@ -55,7 +55,7 @@ class TFcannon():
         init_scatter = tf.math.sqrt(tf.math.reduce_variance(tf_specs, axis=1) -
                                     tfp.stats.percentile(tf_specs_err, 50, axis=1) ** 2.)
 
-        init_scatter = tf.where(tf.math.is_nan(init_scatter), tf.math.reduce_std(spec, axis=1), init_scatter)
+        init_scatter = tf.where(tf.math.is_nan(init_scatter), tf.math.reduce_std(tf_specs, axis=1), init_scatter)
         final_coeffs = tf.ones([self.ncoeffs, 1], dtype=tf.float32) * -9999.
         final_scatter = tf.ones([1], dtype=tf.float32) * -9999.
 
