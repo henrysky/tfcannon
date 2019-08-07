@@ -23,5 +23,7 @@ def load_model(file):
     _model.scatter = np.array(data['scatter'])
     _model.npixel = np.array(data['npixel'])
     _model.nlabels = np.array(data['nlabels'])
+    _model.labels_median = np.array(data['labels_median'])
+    _model.labels_std = np.array(data['labels_std'])
 
     return _model

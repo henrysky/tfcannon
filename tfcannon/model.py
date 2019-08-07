@@ -23,6 +23,10 @@ class TFCannon:
         self.coeffs = None
         self.scatter = None
 
+        # normalization factor
+        self.labels_median = 0.
+        self.labels_std = 1.
+
         self.trained_flag = False
 
     def check_train_flag(self):
@@ -50,9 +54,11 @@ class TFCannon:
         h5f.create_dataset('scatter', data=self.scatter)
         h5f.create_dataset('npixel', data=self.npixels)
         h5f.create_dataset('nlabels', data=self.nlabels)
+        h5f.create_dataset('labels_median', data=self.labels_median)
+        h5f.create_dataset('labels_std', data=self.labels_std)
         h5f.close()
 
-    def train(self, spec, specerr, labels):
+    def train(self, spec, specerr, labels, nor_flag=True):
         """
         Training
 
@@ -60,11 +66,20 @@ class TFCannon:
         :type spec: ndarray
         :param specerr: spectra-err
         :type specerr: ndarray
+        :param labels: labels
+        :type labels: ndarray
+        :param nor_flag: whether to normalize label or not (with median and std)
+        :type nor_flag: bool
         :return: None
         :History: 2019-Aug-02 - Written - Henry Leung (University of Toronto)
         """
         # just in case only one label is provided
         labels = np.atleast_2d(labels)
+
+        if nor_flag:
+            self.labels_median = np.median(labels, axis=0)
+            self.labels_std = np.std(labels, axis=0)
+            labels = (labels - self.labels_median) / self.labels_std
 
         self.nspec = spec.shape[0]
         self.npixels = spec.shape[1]
@@ -140,7 +155,10 @@ class TFCannon:
             ATCiAinv = np.linalg.inv(ATCiA)
             out[ii] = np.dot(ATCiAinv, ATY)[:self.nlabels]
 
-        return out
+        # denormalize labels
+        denorm_out = (out * self.labels_std) + self.labels_median
+
+        return denorm_out
 
     def generate(self, labels):
         """
@@ -152,6 +170,10 @@ class TFCannon:
         :History: 2019-Aug-06 - Written - Henry Leung (University of Toronto)
         """
         self.check_train_flag()
+
+        # normalize labels
+        labels = (labels - self.labels_median) / self.labels_std
+
         # in case of only 1 label, then append offset
         labels = np.hstack([np.ones([1, 1]), np.atleast_2d(labels)])
 
