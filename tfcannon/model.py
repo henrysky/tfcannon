@@ -1,3 +1,4 @@
+import h5py
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -21,6 +22,35 @@ class TFCannon:
 
         self.coeffs = None
         self.scatter = None
+
+        self.trained_flag = False
+
+    def check_train_flag(self):
+        if not self.trained_flag and self.coeffs is not None and self.scatter is not None:
+            raise AttributeError("This model has not been trained")
+        else:
+            pass
+
+    def save(self, name=None):
+        """
+        Save the model
+
+        :param name: Name of the file to be saved
+        :type name: str
+        :return: None
+        :History: 2019-Aug-06 - Written - Henry Leung (University of Toronto)
+        """
+        self.check_train_flag()
+
+        if name is None:
+            name = 'cannon_model'
+
+        h5f = h5py.File(f'{name}', 'w')
+        h5f.create_dataset('ceoffs', data=self.coeffs)
+        h5f.create_dataset('scatter', data=self.scatter)
+        h5f.create_dataset('npixel', data=self.npixels)
+        h5f.create_dataset('nlabels', data=self.nlabels)
+        h5f.close()
 
     def train(self, spec, specerr, labels):
         """
@@ -77,6 +107,7 @@ class TFCannon:
         # set model coeffs
         self.coeffs[:, :] = coeffs[:, 1:]
         self.scatter[:] = scatter[1:]
+        self.trained_flag = True
 
     def test(self, spec, specerr):
         """
@@ -89,6 +120,7 @@ class TFCannon:
         :return: None
         :History: 2019-Aug-06 - Written - Henry Leung (University of Toronto)
         """
+        self.check_train_flag()
         # just in case only one spectrum is provided
         spec = np.atleast_2d(spec)
         specerr = np.atleast_2d(specerr)
@@ -97,9 +129,7 @@ class TFCannon:
         nspec = spec.shape[0]
         ncoeffs = self.coeffs.shape[0]
 
-        nlabels = int((-3 + np.sqrt(9 + 8 * (ncoeffs - 1)))) // 2
-
-        out = np.empty((nspec, nlabels))
+        out = np.empty((nspec, self.nlabels))
 
         for ii in range(nspec):
             deno = specerr[ii] ** 2. + self.scatter ** 2.
@@ -108,7 +138,7 @@ class TFCannon:
             CiA = self.coeffs[1:].T * np.tile(1. / deno, (self.coeffs[1:].T.shape[1], 1)).T
             ATCiA = np.dot(self.coeffs[1:], CiA)
             ATCiAinv = np.linalg.inv(ATCiA)
-            out[ii] = np.dot(ATCiAinv, ATY)[:nlabels]
+            out[ii] = np.dot(ATCiAinv, ATY)[:self.nlabels]
 
         return out
 
@@ -121,6 +151,7 @@ class TFCannon:
         :return: None
         :History: 2019-Aug-06 - Written - Henry Leung (University of Toronto)
         """
+        self.check_train_flag()
         # in case of only 1 label, then append offset
         labels = np.hstack([np.ones([1, 1]), np.atleast_2d(labels)])
 

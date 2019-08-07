@@ -17,7 +17,8 @@ setup(
     packages=find_packages(),
     python_requires='>=3.6',
     install_requires=[
-        'numpy'],
+        'numpy',
+        'h5py'],
     extras_require={
         "tensorflow": ["tensorflow>=1.14.0"],
         "tensorflow-gpu": ["tensorflow-gpu>=1.14.0"],

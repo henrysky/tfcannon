@@ -1,1 +1,27 @@
 from tfcannon.model import TFCannon
+
+
+def load_model(file):
+    """
+    Load a trained Cannon model
+
+    :param regularizer: Regularization
+    :type regularizer: float
+    :return: TFCannon model
+
+    :History: 2019-Aug-02 - Written - Henry Leung (University of Toronto)
+    """
+    import h5py
+    import numpy as np
+
+    _model = TFCannon()
+    _model.trained_flag = True
+
+    data = h5py.File(f'{file}', 'r')
+
+    _model.coeffs = np.array(data['ceoffs'])
+    _model.scatter = np.array(data['scatter'])
+    _model.npixel = np.array(data['npixel'])
+    _model.nlabels = np.array(data['nlabels'])
+
+    return _model

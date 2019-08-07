@@ -19,16 +19,14 @@ Just run ``python setup.py install`` to install or run ``python setup.py develop
 To do list
 ==========================
 
-- Investigate why some operations are still running on CPU??
 - Investigate why ``tfcannon`` is so demanding on GPU bandwidth (thus slower on ``geir``)
 - Add progress bar
-- Add save model function (can I use tensorflow model??)
 - Add travis-CI, because tensorflow easily be broken
 - Include function to find continuum
-- Support censoring
+- Support censoring and regularization
 
-Usage
-=======
+Basic Usage
+============
 
 .. code-block:: python
 
@@ -45,10 +43,18 @@ Usage
     model.coeffs, model.scatters
 
     # Best fit labels when you provide spectra
-     best_fit_labels = model.test(spectra, spectra_err)
+    best_fit_labels = model.test(spectra, spectra_err)
 
     # Generate spectra provided labels
-     spectra = model.generate(labels)
+    spectra = model.generate(labels)
+
+    # save model
+    model.save("cannon_model.h5")
+
+    # load a saved model
+    from tfcannon import load_model
+    model = load_model("cannon_model.h5")
+
 
 Authors
 =========
