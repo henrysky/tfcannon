@@ -19,7 +19,6 @@ Just run ``python setup.py install`` to install or run ``python setup.py develop
 To do list
 ==========================
 
-- Add travis-CI, because tensorflow easily be broken
 - Include function to find continuum
 - Support censoring and regularization
 

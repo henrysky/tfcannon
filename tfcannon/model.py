@@ -119,7 +119,7 @@ class TFCannon:
             config = tf.ConfigProto(device_count={'GPU': 0})
             print("Forcing tfcannon to use CPU")
         else:
-            config = []
+            config = tf.ConfigProto()
 
         print("Start Training")
 
