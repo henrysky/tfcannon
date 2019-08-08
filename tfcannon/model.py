@@ -31,6 +31,7 @@ class TFCannon:
 
         self.trained_flag = False
         self.force_cpu = False
+        self.log_device_placement = False
 
     def check_train_flag(self):
         if not self.trained_flag and self.coeffs is not None and self.scatter is not None:
@@ -115,15 +116,16 @@ class TFCannon:
         final_coeffs = self._polyfit_coeffs(tf_spec, tf_spec_err, result, stack_labels)
 
         # prepare configuration
+        kwargs = {}
         if self.force_cpu:
-            config = tf.ConfigProto(device_count={'GPU': 0})
+            kwargs['device_count'] = {'GPU': 0}
             print("Forcing tfcannon to use CPU")
-        else:
-            config = tf.ConfigProto()
+        if self.log_device_placement:
+            kwargs['log_device_placement'] = True
 
         print("Start Training")
 
-        with tf.compat.v1.Session(config=config) as sess:
+        with tf.compat.v1.Session(config=tf.ConfigProto(**kwargs)) as sess:
             for i in tqdm(np.arange(self.npixels)):
                 a = sess.run([final_coeffs, result], feed_dict={tf_spec: spec[:, i],
                                                                 tf_spec_err: specerr[:, i],
@@ -253,10 +255,9 @@ class TFCannon:
         deno = spec_err ** 2. + scatter ** 2.
 
         # just a workaround, need to fix gradient later
-        output = 0.5 * tf.math.reduce_sum(tres ** 2. / deno) + 0.5 * tf.math.reduce_sum(tf.math.log(deno))
+        output = 0.5 * tf.math.reduce_sum(tres * tres / deno) + 0.5 * tf.math.reduce_sum(tf.math.log(deno))
 
-        # return output, tf.gradients(0.5 * tf.math.reduce_sum(tf.math.log(deno)), scatter)[0]
-        return output, tf.gradients(0.5 * tf.math.reduce_sum(tf.math.log(deno)), scatter)[0]
+        return output, tf.gradients(output, scatter)[0]
 
     def _polyfit_coeffs(self, spec, specerr, scatter, labelA):
         """
