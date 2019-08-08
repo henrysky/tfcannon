@@ -1,3 +1,5 @@
+from tqdm import tqdm
+
 import h5py
 import numpy as np
 import tensorflow as tf
@@ -28,6 +30,7 @@ class TFCannon:
         self.labels_std = 1.
 
         self.trained_flag = False
+        self.force_cpu = False
 
     def check_train_flag(self):
         if not self.trained_flag and self.coeffs is not None and self.scatter is not None:
@@ -58,7 +61,7 @@ class TFCannon:
         h5f.create_dataset('labels_std', data=self.labels_std)
         h5f.close()
 
-    def train(self, spec, specerr, labels, nor_flag=True):
+    def train(self, spec, specerr, labels, norm_flag=True):
         """
         Training
 
@@ -68,15 +71,15 @@ class TFCannon:
         :type specerr: ndarray
         :param labels: labels
         :type labels: ndarray
-        :param nor_flag: whether to normalize label or not (with median and std)
-        :type nor_flag: bool
+        :param norm_flag: whether to normalize label or not (with median and std)
+        :type norm_flag: bool
         :return: None
         :History: 2019-Aug-02 - Written - Henry Leung (University of Toronto)
         """
         # just in case only one label is provided
         labels = np.atleast_2d(labels)
 
-        if nor_flag:
+        if norm_flag:
             self.labels_median = np.median(labels, axis=0)
             self.labels_std = np.std(labels, axis=0)
             labels = (labels - self.labels_median) / self.labels_std
@@ -89,39 +92,46 @@ class TFCannon:
         self.coeffs = np.zeros((self.ncoeffs, self.npixels)) + np.nan
         self.scatter = np.zeros(self.npixels) + np.nan
 
-        tf_specs = tf.convert_to_tensor(spec, dtype=tf.float32)
-        tf_specs_err = tf.convert_to_tensor(specerr, dtype=tf.float32)
+        init_scatter = np.sqrt(np.var(spec, axis=1) - np.median(specerr, axis=1) ** 2.)
+        init_scatter[np.isnan(init_scatter)] = np.std(spec, axis=1)[np.isnan(init_scatter)]
+
         tf_labels = tf.convert_to_tensor(labels, dtype=tf.float32)
 
         # internal label matrix
         stack_labels = self._quad_terms(tf.concat([tf.ones([self.nspec, 1], dtype=tf.float32), tf_labels], axis=1))
 
-        # initial
-        init_scatter = tf.math.sqrt(tf.math.reduce_variance(tf_specs, axis=1) -
-                                    tfp.stats.percentile(tf_specs_err, 50, axis=1) ** 2.)
+        tf_spec = tf.compat.v1.placeholder(tf.float32, shape=[self.nspec])
+        tf_spec_err = tf.compat.v1.placeholder(tf.float32, shape=[self.nspec])
+        tf_scatter = tf.compat.v1.placeholder(tf.float32, shape=[1])
 
-        init_scatter = tf.where(tf.math.is_nan(init_scatter), tf.math.reduce_std(tf_specs, axis=1), init_scatter)
-        final_coeffs = tf.ones([self.ncoeffs, 1], dtype=tf.float32) * -9999.
-        final_scatter = tf.ones([1], dtype=tf.float32) * -9999.
+        def _quadfit_scatter_external(x):
+            return self._quadfit_scatter(x, tf_spec, tf_spec_err, stack_labels)
 
-        i = tf.constant(0)
-        out = tf.while_loop(lambda _specs, _specserr, _labels, _init_scatter, _i, _, __: tf.less(_i, self.npixels),
-                            self._quad_fitting,
-                            [tf_specs, tf_specs_err, stack_labels, init_scatter, i, final_coeffs, final_scatter],
-                            shape_invariants=[tf_specs.get_shape(),
-                                              tf_specs_err.get_shape(),
-                                              stack_labels.get_shape(),
-                                              init_scatter.get_shape(),
-                                              i.get_shape(),
-                                              tf.TensorShape([self.ncoeffs, None]),
-                                              tf.TensorShape([None, ])])
+        fits = tfp.optimizer.lbfgs_minimize(_quadfit_scatter_external,
+                                            tf_scatter,
+                                            x_tolerance=1e-7)
+        result = fits.position
 
-        with tf.Session() as sess:
-            _, _, _, _, _, coeffs, scatter = sess.run(out)
+        final_coeffs = self._polyfit_coeffs(tf_spec, tf_spec_err, result, stack_labels)
 
-        # set model coeffs
-        self.coeffs[:, :] = coeffs[:, 1:]
-        self.scatter[:] = scatter[1:]
+        # prepare configuration
+        if self.force_cpu:
+            config = tf.ConfigProto(device_count={'GPU': 0})
+            print("Forcing tfcannon to use CPU")
+        else:
+            config = []
+
+        print("Start Training")
+
+        with tf.compat.v1.Session(config=config) as sess:
+            for i in tqdm(np.arange(self.npixels)):
+                a = sess.run([final_coeffs, result], feed_dict={tf_spec: spec[:, i],
+                                                                tf_spec_err: specerr[:, i],
+                                                                tf_scatter: init_scatter[i:i + 1]})
+                # set model coeffs
+                self.coeffs[:, i] = a[0]
+                self.scatter[:] = a[1]
+
         self.trained_flag = True
 
     def test(self, spec, specerr):
@@ -142,7 +152,6 @@ class TFCannon:
 
         # Setup output
         nspec = spec.shape[0]
-        ncoeffs = self.coeffs.shape[0]
 
         out = np.empty((nspec, self.nlabels))
 
@@ -204,27 +213,12 @@ class TFCannon:
                                    loop_body,
                                    [padded, i],
                                    shape_invariants=[tf.TensorShape([self.nspec, None]),
-                                                     i.get_shape()])
+                                                     i.get_shape()],
+                                   parallel_iterations=1,
+                                   back_prop=False,
+                                   swap_memory=False,
+                                   return_same_structure=True)
         return all_padded[0]
-
-    def _quad_fitting(self, specs, specs_err, labels, scatters, ii, final_coeffs, final_scatter):
-        spec = specs[:, ii]
-        spec_err = specs_err[:, ii]
-        scatter = scatters[ii:ii + 1]
-
-        def _quadfit_scatter_external(x):
-            return self._quadfit_scatter(x, spec, spec_err, labels)
-
-        fits = tfp.optimizer.lbfgs_minimize(_quadfit_scatter_external,
-                                            scatter,
-                                            x_tolerance=1e-7)
-        result = fits.position
-
-        final_coeffs = tf.concat(
-            [final_coeffs, tf.expand_dims(self._polyfit_coeffs(spec, spec_err, result, labels), axis=1)], axis=1)
-        final_scatter = tf.concat([final_scatter, result], axis=0)
-
-        return specs, specs_err, labels, scatters, tf.add(ii, 1), final_coeffs, final_scatter
 
     def _quadfit_scatter(self, scatter, spec, spec_err, labelA):
         """
@@ -235,10 +229,10 @@ class TFCannon:
         mspec = tf.math.reduce_sum(tcoeffs[1:self.nlabels + 1] * labelA[:, 1:self.nlabels + 1], axis=-1)
 
         def loop_body(_mspec, ii):
-            label_terms = labelA[:, ii+1:ii+2] * labelA[:, ii + 1:self.nlabels + 1]
+            label_terms = labelA[:, ii + 1:ii + 2] * labelA[:, ii + 1:self.nlabels + 1]
             terms = tf.math.reduce_sum((tcoeffs[self.nlabels + 1 + (ii * (2 * self.nlabels + 1 - ii)) // 2:
                                                 self.nlabels + 1 + (ii * (
-                                                            2 * self.nlabels + 1 - ii)) // 2 + self.nlabels - ii]) *
+                                                        2 * self.nlabels + 1 - ii)) // 2 + self.nlabels - ii]) *
                                        label_terms,
                                        axis=1)
             _mspec = tf.add(_mspec, terms)
@@ -249,13 +243,20 @@ class TFCannon:
                                   loop_body,
                                   [mspec, i],
                                   shape_invariants=[tf.TensorShape([self.nspec, ]),
-                                                    i.get_shape()])[0]
+                                                    i.get_shape()],
+                                  parallel_iterations=self.nlabels,
+                                  back_prop=False,
+                                  swap_memory=False,
+                                  return_same_structure=True)[0]
 
         tres = spec - sum_mspec - tcoeffs[0]
         deno = spec_err ** 2. + scatter ** 2.
+
+        # just a workaround, need to fix gradient later
         output = 0.5 * tf.math.reduce_sum(tres ** 2. / deno) + 0.5 * tf.math.reduce_sum(tf.math.log(deno))
 
-        return output, tf.gradients(output, scatter)[0]
+        # return output, tf.gradients(0.5 * tf.math.reduce_sum(tf.math.log(deno)), scatter)[0]
+        return output, tf.gradients(0.5 * tf.math.reduce_sum(tf.math.log(deno)), scatter)[0]
 
     def _polyfit_coeffs(self, spec, specerr, scatter, labelA):
         """

@@ -19,8 +19,6 @@ Just run ``python setup.py install`` to install or run ``python setup.py develop
 To do list
 ==========================
 
-- Investigate why ``tfcannon`` is so demanding on GPU bandwidth (thus slower on ``geir``)
-- Add progress bar
 - Add travis-CI, because tensorflow easily be broken
 - Include function to find continuum
 - Support censoring and regularization
@@ -33,6 +31,10 @@ Basic Usage
     from tfcannon import TFCannon
 
     model = TFCannon()
+
+    # whether to force to use CPU even GPU presents
+    model.force_cpu = False
+
     # x: your spectra
     # x_err: your spectra error
     # y: your labels
