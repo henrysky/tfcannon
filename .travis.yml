@@ -4,7 +4,7 @@ dist: xenial
 
 env:
   matrix:
-    - LATEST_FLAG=true TF_VER="2.0.0b1" TFP_VER="tfp-nightly"  # latest version config
+#    - LATEST_FLAG=true TF_VER="2.0.0b1" TFP_VER="tfp-nightly"  # latest version config
     - LATEST_FLAG=true TF_VER="1.14.0" TFP_VER="tensorflow-probability==0.7.0"  # previous version config
 
 python:
