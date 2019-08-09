@@ -1,9 +1,16 @@
 from tqdm import tqdm
+from packaging import version
 
 import h5py
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
+
+tf2_flag = True if version.parse("2.0.0b0") <= version.parse(tf.__version__) else False
+
+if tf2_flag:
+    # disable eager execution to be compatible with tf2
+    tf.compat.v1.disable_eager_execution()
 
 
 class TFCannon:
