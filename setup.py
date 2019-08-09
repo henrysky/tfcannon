@@ -18,13 +18,21 @@ setup(
     python_requires='>=3.6',
     install_requires=[
         'numpy',
+        'astropy',
         'h5py',
-        'tqdm'],
+        'matplotlib',
+        'tqdm',
+        'packaging'],
     extras_require={
         "tensorflow": ["tensorflow>=1.14.0"],
         "tensorflow-gpu": ["tensorflow-gpu>=1.14.0"],
         "tensorflow-probability": ["tensorflow-probability>=0.7.0"]},
     url='https://github.com/henrysky/tfcannon',
+    project_urls={
+        "Bug Tracker": "https://github.com/henrysky/tfcannon/issues",
+        "Documentation": "https://github.com/henrysky/tfcannon",
+        "Source Code": "https://github.com/henrysky/tfcannon",
+    },
     license='MIT',
     author='Henry Leung',
     author_email='henrysky.leung@mail.utoronto.ca',
