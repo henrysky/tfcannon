@@ -7,7 +7,14 @@ class TFCannonTestCase(unittest.TestCase):
         import numpy as np
         import h5py
 
-        h5f = h5py.File('apogee_dr14_test.h5', 'r')
+        try:
+            h5f = h5py.File('tests/apogee_dr14_test.h5', 'r')
+        except OSError:
+            try:
+                h5f = h5py.File('tfcannon/tests/apogee_dr14_test.h5', 'r')
+            except OSError:
+                h5f = h5py.File('apogee_dr14_test.h5', 'r')
+
         spec = np.array(h5f["spectra"])
         spec_err = np.array(h5f["spectra_error"])
         labels = np.array(h5f["teff_logg_feh_mgh"])
