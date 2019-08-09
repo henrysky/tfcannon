@@ -126,25 +126,13 @@ class TFCannon:
         print("Start Training")
 
         with tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(**kwargs)) as sess:
-            writer = tf.compat.v1.summary.FileWriter('./output', sess.graph)
             for i in tqdm(np.arange(self.npixels)):
-                if i == self.npixels - 1:
-                    run_metadata = tf.compat.v1.RunMetadata()
-                    run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
-                    a = sess.run([final_coeffs, result], feed_dict={tf_spec: spec[:, i],
-                                                                    tf_spec_err: specerr[:, i],
-                                                                    tf_scatter: init_scatter[i:i + 1]},
-                                 options=run_options,
-                                 run_metadata=run_metadata)
-                    writer.add_run_metadata(run_metadata, 'Pixel {i}')
-                else:
-                    a = sess.run([final_coeffs, result], feed_dict={tf_spec: spec[:, i],
-                                                                    tf_spec_err: specerr[:, i],
-                                                                    tf_scatter: init_scatter[i:i + 1]})
+                a = sess.run([final_coeffs, result], feed_dict={tf_spec: spec[:, i],
+                                                                tf_spec_err: specerr[:, i],
+                                                                tf_scatter: init_scatter[i:i + 1]})
                 # set model coeffs
                 self.coeffs[:, i] = a[0]
                 self.scatter[:] = a[1]
-            writer.close()
         self.trained_flag = True
 
     def test(self, spec, specerr):
