@@ -13,17 +13,19 @@ and acknowledge this repository as you like.
 Installation
 =================
 
-``tfcannon`` requires ``python>=3.6`` and ``tensorflow>=1.14.0`` and ``tensorflow_probability>=0.7.0``
+``tfcannon`` requires ``python>=3.6`` and ``tensorflow>=1.14.0`` (including ``tensorflow>=2.0.0b1``) and ``tensorflow_probability>=0.7.0``
 
 NVIDIA GPU is required if you want it to run on GPU
 
 Just run ``python setup.py install`` to install or run ``python setup.py develop`` to develop
 
-To do list
+Tutorial
 ==========================
 
-- Include function to find continuum
-- Support censoring and regularization
+An example notebook with APOGEE DR14 is avaliable at here_
+
+.. _here: tutorial/apogee_dr14_tutorial.ipynb
+
 
 Basic Usage
 ============
@@ -59,6 +61,11 @@ Basic Usage
     from tfcannon import load_model
     model = load_model("cannon_model.h5")
 
+To do list
+==========================
+
+- Include function to find continuum
+- Support censoring and regularization
 
 Authors
 =========

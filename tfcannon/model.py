@@ -187,18 +187,26 @@ class TFCannon:
         :History: 2019-Aug-06 - Written - Henry Leung (University of Toronto)
         """
         self.check_train_flag()
+        labels = np.atleast_2d(labels)
 
         # normalize labels
         labels = (labels - self.labels_median) / self.labels_std
 
         # in case of only 1 label, then append offset
-        labels = np.hstack([np.ones([1, 1]), np.atleast_2d(labels)])
+        labels = np.hstack([np.ones([labels.shape[0], 1]), labels])
+
+        result = np.zeros([labels.shape[0], self.npixels])
 
         # append quadratic terms
-        for ii in range(self.nlabels):
-            labels = np.hstack([labels, labels[:, ii + 1:self.nlabels + 1] * np.atleast_2d(labels[:, ii + 1])])
+        counter = 0
+        for label in labels:
+            label = np.atleast_2d(label)
+            for ii in range(self.nlabels):
+                label = np.hstack([label, label[:, ii + 1:self.nlabels + 1] * np.atleast_2d(label[:, ii + 1])])
+            result[counter] = np.dot(label, self.coeffs)
+            counter += 1
 
-        return np.dot(labels, self.coeffs)
+        return result
 
     def _quad_terms(self, padded):
         """
