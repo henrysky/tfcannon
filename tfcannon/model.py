@@ -14,16 +14,16 @@ if tf2_flag:
 
 
 class TFCannon:
-    def __init__(self, regularizer=None):
+    def __init__(self, l1_regularization=0.):
         """
         The Cannon implementation with Tensorflow
 
-        :param regularizer: Regularization
-        :type regularizer: float
+        :param l1_regularization: Regularization
+        :type l1_regularization: float
         :return: None
         :History: 2019-Aug-02 - Written - Henry Leung (University of Toronto)
         """
-        self.regularizer = regularizer
+        self.l1_regularization = l1_regularization
         self.nspec = None
         self.npixels = None
         self.nlabels = None
@@ -112,10 +112,10 @@ class TFCannon:
         tf_spec_err = tf.compat.v1.placeholder(tf.float32, shape=[self.nspec])
         tf_scatter = tf.compat.v1.placeholder(tf.float32, shape=[1])
 
-        def _quadfit_scatter_external(x):
-            return self._quadfit_scatter(x, tf_spec, tf_spec_err, stack_labels)
+        def _objective_func_external(x):
+            return self._quadfit_objective(x, tf_spec, tf_spec_err, stack_labels)
 
-        fits = tfp.optimizer.lbfgs_minimize(_quadfit_scatter_external,
+        fits = tfp.optimizer.lbfgs_minimize(_objective_func_external,
                                             tf_scatter,
                                             x_tolerance=1e-7)
         result = fits.position
@@ -234,9 +234,9 @@ class TFCannon:
                                    back_prop=False)
         return all_padded[0]
 
-    def _quadfit_scatter(self, scatter, spec, spec_err, labelA):
+    def _quadfit_objective(self, scatter, spec, spec_err, labelA):
         """
-        Optimize the coefficients for this scatter
+        Optimize the coefficients with this objective function
         """
         tcoeffs = self._polyfit_coeffs(spec, spec_err, scatter, labelA)
         # Get residuals for a given linear model of the spectra
@@ -264,8 +264,8 @@ class TFCannon:
         tres = spec - sum_mspec - tcoeffs[0]
         deno = spec_err ** 2. + scatter ** 2.
 
-        # just a workaround, need to fix gradient later
-        output = 0.5 * tf.math.reduce_sum(tres * tres / deno) + 0.5 * tf.math.reduce_sum(tf.math.log(deno))
+        output = 0.5 * tf.math.reduce_sum(tres * tres / deno) + 0.5 * tf.math.reduce_sum(tf.math.log(deno)) + \
+                 self.l1_regularization * tf.math.reduce_sum(tf.math.abs(tcoeffs[1:]))
 
         return output, tf.gradients(output, scatter)[0]
 

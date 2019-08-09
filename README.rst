@@ -34,7 +34,9 @@ Basic Usage
 
     from tfcannon import TFCannon
 
-    model = TFCannon()
+    # create a model object
+    # L1 regularizer coefficient
+    model = TFCannon(l1_regularization=1000)
 
     # whether to force to use CPU even GPU presents
     model.force_cpu = False
@@ -65,7 +67,7 @@ To do list
 ==========================
 
 - Include function to find continuum
-- Support censoring and regularization
+- Support censoring
 
 Authors
 =========

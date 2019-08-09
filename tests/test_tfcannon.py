@@ -19,7 +19,7 @@ class TFCannonTestCase(unittest.TestCase):
         spec_err = np.array(h5f["spectra_error"])
         labels = np.array(h5f["teff_logg_feh_mgh"])
 
-        model = TFCannon()
+        model = TFCannon(l1_regularization=0.)
         model.train(spec, spec_err, labels)
         label_before = model.test(spec, spec_err)
         model.save('saved_model.h5')
