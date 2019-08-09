@@ -216,9 +216,7 @@ class TFCannon:
                                    shape_invariants=[tf.TensorShape([self.nspec, None]),
                                                      i.get_shape()],
                                    parallel_iterations=1,
-                                   back_prop=False,
-                                   swap_memory=False,
-                                   return_same_structure=True)
+                                   back_prop=False)
         return all_padded[0]
 
     def _quadfit_scatter(self, scatter, spec, spec_err, labelA):
@@ -246,9 +244,7 @@ class TFCannon:
                                   shape_invariants=[tf.TensorShape([self.nspec, ]),
                                                     i.get_shape()],
                                   parallel_iterations=self.nlabels,
-                                  back_prop=False,
-                                  swap_memory=False,
-                                  return_same_structure=True)[0]
+                                  back_prop=False)[0]
 
         tres = spec - sum_mspec - tcoeffs[0]
         deno = spec_err ** 2. + scatter ** 2.
