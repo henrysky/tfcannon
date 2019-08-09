@@ -1,3 +1,6 @@
+.. image:: https://travis-ci.org/henrysky/tfcannon.svg?branch=master
+   :target: https://travis-ci.org/henrysky/tfcannon
+   :alt: Build Status
 
 Introduction
 ==============

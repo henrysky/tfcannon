@@ -2,9 +2,27 @@ import unittest
 
 
 class TFCannonTestCase(unittest.TestCase):
-    def test_load_model(self):
-        self.assertEqual(True, True)
-        print("Okay")
+    def test_main(self):
+        from tfcannon import TFCannon, load_model
+        import numpy as np
+        import h5py
+
+        h5f = h5py.File('apogee_dr14_test.h5', 'r')
+        spec = np.array(h5f["spectra"])
+        spec_err = np.array(h5f["spectra_error"])
+        labels = np.array(h5f["teff_logg_feh_mgh"])
+
+        model = TFCannon()
+        model.train(spec, spec_err, labels)
+        label_before = model.test(spec, spec_err)
+        model.save('saved_model.h5')
+
+        _model = load_model('saved_model.h5')
+        label_after = _model.test(spec, spec_err)
+        # assert it is deterministic
+        self.assertEqual(np.all(label_before == label_after), True)
+        # assert label is accurate more or less
+        self.assertEqual(np.sum(np.abs(label_after[:, 0]-labels[:, 0]) < 100) > 4000, True)
 
 
 if __name__ == '__main__':
