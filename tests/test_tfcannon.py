@@ -25,9 +25,9 @@ class TFCannonTestCase(unittest.TestCase):
         model.save('saved_model.h5')
 
         _model = load_model('saved_model.h5')
-        label_after = _model.test(spec, spec_err)
-        # assert it is deterministic
-        self.assertEqual(np.all(label_before == label_after), True)
+        label_after = _model.test(spec, spec_err, tensorflow=True)
+        # assert it is deterministic and tensorflow working fine
+        np.testing.assert_almost_equal(label_before, label_after, decimal=1)
         # assert label is accurate more or less
         self.assertEqual(np.sum(np.abs(label_after[:, 0]-labels[:, 0]) < 100) > 4000, True)
 

@@ -142,7 +142,7 @@ class TFCannon:
                 self.scatter[:] = a[1]
         self.trained_flag = True
 
-    def test(self, spec, specerr):
+    def test(self, spec, specerr, tensorflow=False):
         """
         Takes spectra and return best fit labels (based on numpy so far, numpy seems faster)
 
@@ -150,12 +150,14 @@ class TFCannon:
         :type spec: ndarray
         :param specerr: spectra-err
         :type specerr: ndarray
+        :param tensorflow: whether to use Tensorflow or NumPy
+        :type tensorflow: bool
         :return: None
         :History: 2019-Aug-06 - Written - Henry Leung (University of Toronto)
         """
         self.check_train_flag()
         # just in case only one spectrum is provided
-        spec = np.atleast_2d(spec)
+        spec = np.atleast_2d(spec) - self.coeffs[0]
         specerr = np.atleast_2d(specerr)
 
         # Setup output
@@ -163,14 +165,38 @@ class TFCannon:
 
         out = np.empty((nspec, self.nlabels))
 
-        for ii in range(nspec):
-            deno = specerr[ii] ** 2. + self.scatter ** 2.
-            Y = (spec[ii] - self.coeffs[0]) / deno
-            ATY = np.dot(self.coeffs[1:], Y)
-            CiA = self.coeffs[1:].T * np.tile(1. / deno, (self.coeffs[1:].T.shape[1], 1)).T
-            ATCiA = np.dot(self.coeffs[1:], CiA)
-            ATCiAinv = np.linalg.inv(ATCiA)
-            out[ii] = np.dot(ATCiAinv, ATY)[:self.nlabels]
+        if not tensorflow:
+            for ii in range(nspec):
+                    deno = specerr[ii] ** 2. + self.scatter ** 2.
+                    Y = spec[ii] / deno
+                    ATY = np.dot(self.coeffs[1:], Y)
+                    CiA = self.coeffs[1:].T * np.tile(1. / deno, (self.coeffs[1:].T.shape[1], 1)).T
+                    ATCiA = np.dot(self.coeffs[1:], CiA)
+                    ATCiAinv = np.linalg.inv(ATCiA)
+                    out[ii] = np.dot(ATCiAinv, ATY)[:self.nlabels]
+        else:
+            # prepare configuration
+            kwargs = {}
+            if self.force_cpu:
+                kwargs['device_count'] = {'GPU': 0}
+                print("Forcing tfcannon to use CPU")
+            if self.log_device_placement:
+                kwargs['log_device_placement'] = True
+
+            with tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(**kwargs)) as sess:
+                tf_spec = tf.compat.v1.placeholder(tf.float32, shape=[self.nspec])
+                tf_spec_err = tf.compat.v1.placeholder(tf.float32, shape=[self.nspec])
+                tf_scatter = tf.compat.v1.placeholder(tf.float32, shape=self.scatter.shape)
+                tf_labelA = tf.compat.v1.placeholder(tf.float32, shape=self.coeffs[1:].T.shape)
+
+                tf_func = self._polyfit_coeffs(tf_spec, tf_spec_err, tf_scatter, tf_labelA)
+
+                for ii in range(nspec):
+                    a = sess.run(tf_func, feed_dict={tf_spec: spec[ii],
+                                                     tf_spec_err: specerr[ii],
+                                                     tf_scatter: self.scatter,
+                                                     tf_labelA: self.coeffs[1:].T})
+                    out[ii] = a[:self.nlabels]
 
         # denormalize labels
         denorm_out = (out * self.labels_std) + self.labels_median
@@ -264,8 +290,8 @@ class TFCannon:
         tres = spec - sum_mspec - tcoeffs[0]
         deno = spec_err ** 2. + scatter ** 2.
 
-        output = 0.5 * tf.math.reduce_sum(tres * tres / deno) + 0.5 * tf.math.reduce_sum(tf.math.log(deno)) + \
-                 self.l1_regularization * tf.math.reduce_sum(tf.math.abs(tcoeffs[1:]))
+        output = 0.5 * tf.math.reduce_sum(tres * tres / deno) + 0.5 * tf.math.reduce_sum(
+            tf.math.log(deno)) + self.l1_regularization * tf.math.reduce_sum(tf.math.abs(tcoeffs[1:]))
 
         return output, tf.gradients(output, scatter)[0]
 
