@@ -22,7 +22,10 @@ Just run ``python setup.py install`` to install or run ``python setup.py develop
 Tutorial
 ==========================
 
-An example notebook with APOGEE DR14 is avaliable at here_
+An example notebook of using APOGEE DR14 is available at here_ with trimmed data included in the respository
+
+If Github has issue (or too slow) to load the Jupyter Notebooks, you can go
+https://nbviewer.jupyter.org/github/henrysky/tfcannon/tree/master/tutorial/
 
 .. _here: tutorial/apogee_dr14_tutorial.ipynb
 
