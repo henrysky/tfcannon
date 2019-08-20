@@ -47,8 +47,9 @@ Basic Usage
     # x: your spectra
     # x_err: your spectra error
     # y: your labels
+    # norm_flag: False to not normalizing, True to simple median and std, 'cannon2' to do Cannon 2 like normalization
     # this will fit a quadratic relation
-    model.train(x, x_err, y)
+    model.train(x, x_err, y, norm_flag='cannon2')
 
     # final coefficient and result
     model.coeffs, model.scatters

@@ -1,4 +1,5 @@
 from tqdm import tqdm
+import warnings
 from packaging import version
 
 import h5py
@@ -67,6 +68,7 @@ class TFCannon:
         h5f.create_dataset('nlabels', data=self.nlabels)
         h5f.create_dataset('labels_median', data=self.labels_median)
         h5f.create_dataset('labels_std', data=self.labels_std)
+        h5f.create_dataset('l1_regularization', data=self.l1_regularization)
         h5f.close()
 
     def train(self, spec, specerr, labels, norm_flag=True):
@@ -79,18 +81,32 @@ class TFCannon:
         :type specerr: ndarray
         :param labels: labels
         :type labels: ndarray
-        :param norm_flag: whether to normalize label or not (with median and std)
-        :type norm_flag: bool
+        :param norm_flag: | whether to normalize label or not (with median and std) or
+                          | 'cannon2' to subtract median and divided by 2 * (97.5 percentile - 2.5 percentile)
+        :type norm_flag: Union([bool, str])
         :return: None
         :History: 2019-Aug-02 - Written - Henry Leung (University of Toronto)
         """
         # just in case only one label is provided
         labels = np.atleast_2d(labels)
 
-        if norm_flag:
+        if norm_flag is True:
             self.labels_median = np.median(labels, axis=0)
             self.labels_std = np.std(labels, axis=0)
             labels = (labels - self.labels_median) / self.labels_std
+        elif isinstance(norm_flag, str):
+            if norm_flag.lower() == 'cannon2':
+                if self.l1_regularization != 1e3:
+                    warnings.warn(f"It is recommended to set L1 regularization factor same as Cannon 2 which is 1000 "
+                                  f"(You are using {self.l1_regularization}) when using Cannon 2 like normalization.",
+                                  UserWarning)
+                self.labels_median = np.median(labels, axis=0)
+                self.labels_std = 2 * (np.percentile(labels, 97.5, axis=0) - np.percentile(labels, 2.5, axis=0))
+                labels = (labels - self.labels_median) / self.labels_std
+            else:
+                raise ValueError(f"Unknown norm_flag={norm_flag}")
+        else:
+            pass
 
         self.nspec = spec.shape[0]
         self.npixels = spec.shape[1]
@@ -167,13 +183,13 @@ class TFCannon:
 
         if not tensorflow:
             for ii in range(nspec):
-                    deno = specerr[ii] ** 2. + self.scatter ** 2.
-                    Y = spec[ii] / deno
-                    ATY = np.dot(self.coeffs[1:], Y)
-                    CiA = self.coeffs[1:].T * np.tile(1. / deno, (self.coeffs[1:].T.shape[1], 1)).T
-                    ATCiA = np.dot(self.coeffs[1:], CiA)
-                    ATCiAinv = np.linalg.inv(ATCiA)
-                    out[ii] = np.dot(ATCiAinv, ATY)[:self.nlabels]
+                deno = specerr[ii] ** 2. + self.scatter ** 2.
+                Y = spec[ii] / deno
+                ATY = np.dot(self.coeffs[1:], Y)
+                CiA = self.coeffs[1:].T * np.tile(1. / deno, (self.coeffs[1:].T.shape[1], 1)).T
+                ATCiA = np.dot(self.coeffs[1:], CiA)
+                ATCiAinv = np.linalg.inv(ATCiA)
+                out[ii] = np.dot(ATCiAinv, ATY)[:self.nlabels]
         else:
             # prepare configuration
             kwargs = {}
