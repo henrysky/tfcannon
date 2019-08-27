@@ -37,6 +37,9 @@ class TFCannon:
         self.labels_median = 0.
         self.labels_std = 1.
 
+        # labels names
+        self.label_names = ['Teff', 'Logg', 'M_H', 'Alpha_M']
+
         self.trained_flag = False
         self.force_cpu = False
         self.log_device_placement = False
@@ -69,6 +72,7 @@ class TFCannon:
         h5f.create_dataset('labels_median', data=self.labels_median)
         h5f.create_dataset('labels_std', data=self.labels_std)
         h5f.create_dataset('l1_regularization', data=self.l1_regularization)
+        h5f.create_dataset('label_names', data=self.label_names)
         h5f.close()
 
     def train(self, spec, specerr, labels, norm_flag=True):
@@ -306,9 +310,12 @@ class TFCannon:
         tres = spec - sum_mspec - tcoeffs[0]
         deno = spec_err ** 2. + scatter ** 2.
 
-        output = 0.5 * tf.math.reduce_sum(tres * tres / deno) + 0.5 * tf.math.reduce_sum(
-            tf.math.log(deno)) + self.l1_regularization * tf.math.reduce_sum(tf.math.abs(tcoeffs[1:]))
+        tcoeffs_nobias = tcoeffs[1:]
 
+        output = 0.5 * tf.math.reduce_sum(tres * tres / deno) + 0.5 * tf.math.reduce_sum(
+            tf.math.log(deno)) + self.l1_regularization * tf.math.reduce_sum(tf.math.abs(tcoeffs_nobias))
+
+        # TODO: Not taking gradient properly
         return output, tf.gradients(output, scatter)[0]
 
     def _polyfit_coeffs(self, spec, specerr, scatter, labelA):

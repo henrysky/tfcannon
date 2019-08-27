@@ -26,5 +26,9 @@ def load_model(file):
     _model.labels_median = np.array(data['labels_median'])
     _model.labels_std = np.array(data['labels_std'])
     _model.l1_regularization = np.array(data['l1_regularization'])
+    try:
+        _model.label_names = np.array(data['label_names'])
+    except KeyError:
+        pass
 
     return _model
