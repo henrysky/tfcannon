@@ -72,7 +72,7 @@ class TFCannon:
         h5f.create_dataset('labels_median', data=self.labels_median)
         h5f.create_dataset('labels_std', data=self.labels_std)
         h5f.create_dataset('l1_regularization', data=self.l1_regularization)
-        h5f.create_dataset('label_names', data=self.label_names)
+        h5f.create_dataset('label_names', data=np.array(self.label_names, dtype='S'))
         h5f.close()
 
     def train(self, spec, specerr, labels, norm_flag=True):

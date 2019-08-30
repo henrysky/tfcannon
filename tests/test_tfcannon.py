@@ -20,6 +20,7 @@ class TFCannonTestCase(unittest.TestCase):
         labels = np.array(h5f["teff_logg_feh_mgh"])
 
         model = TFCannon(l1_regularization=1000.)
+        model.label_names = ['Teff_123', 'Logg', 'Fe_H', 'Mg_H']
         model.train(spec, spec_err, labels, norm_flag='cannon2')
         label_before = model.test(spec, spec_err)
         model.save('saved_model.h5')
@@ -30,7 +31,8 @@ class TFCannonTestCase(unittest.TestCase):
         np.testing.assert_almost_equal(label_before, label_after, decimal=1)
         # assert label is accurate more or less
         self.assertEqual(np.sum(np.abs(label_after[:, 0]-labels[:, 0]) < 100) > 4000, True)
-
+        # assert loading name correctly
+        self.assertEqual(_model.label_names[0] == model.label_names[0], True)
 
 if __name__ == '__main__':
     unittest.main()
