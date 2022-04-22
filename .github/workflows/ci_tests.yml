@@ -26,7 +26,7 @@ jobs:
         run: |
           pip install tensorflow==${{ matrix.TF_VER }}
           pip install tensorflow-probability==${{ matrix.TFP_VER }}
-          pip install coveralls pytest pytest-cov
+          pip install coveralls pytest pytest-cov extension-helpers
           python setup.py install
       - name: Test tfcannon
         continue-on-error: ${{ matrix.ALLOW_FAILURE }}
